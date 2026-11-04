@@ -134,6 +134,9 @@
   section.folded .sec-toggle .action::before { content: "Show"; }
   section.folded .sec-toggle .chev { transform: rotate(-90deg); }
   section.folded .team-cards { display: none; }
+  .config-banner { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; border-left: 4px solid var(--warn); background: var(--warn-bg); }
+  .config-banner[hidden] { display: none; }
+  .config-banner .actions { display: flex; gap: 8px; margin-left: auto; }
   .pos-player { color: var(--text); }
   .pos-player::before { content: "★ "; color: var(--warn); }
   .card-loading { padding: 0 14px 12px; color: var(--muted); }
@@ -233,6 +236,10 @@
   <button id="refresh" title="Reload all data">↻</button>
 </header>
 <main>
+  <section class="wide config-banner" id="config-banner" hidden>
+    <span><b>config.js has changed</b> since the team list was edited on this device, so this device is still showing its own list.</span>
+    <span class="actions"><button class="primary" data-config="use">Use config.js</button><button data-config="keep">Keep this device's list</button></span>
+  </section>
   <section class="wide bare" id="comp-section" hidden>
     <div class="comp-bar" id="comp-bar"></div>
   </section>
@@ -297,7 +304,9 @@ const API = "https://api.promiedos.com.ar";
 const SITE = "https://www.promiedos.com.ar";
 const API_VERSION = "1.11.7.5"; // promiedos rejects (empty {}) requests without the X-VER header
 const CFG = window.TRACKER_CONFIG;
-const STORE_TEAMS = "tracker.teams.v1";
+const STORE_TEAMS_V1 = "tracker.teams.v1"; // old format: plain list, also written by collapse/drag
+const STORE_TEAMS = "tracker.teams.v2";    // {base, teams}: only written by edits in the Manage panel
+const STORE_LAYOUT = "tracker.layout.v1";  // {order: [ids], expanded: [ids]}: card order, and cards opened (they start collapsed)
 const STORE_FOLDED = "tracker.foldedSections.v1";
 const STORE_RIVAL_OF = "tracker.rivalOf.v1";
 const STORE_INDEX = `tracker.teamIndex.v1:${(CFG.searchLeagues || []).join(",")}`; // rebuilt when the league list changes
@@ -311,18 +320,60 @@ const gamecenterCache = new Map();
 const leagueCache = new Map();
 const teamDataCache = new Map();
 
-// ---------- settings (config.js defaults, overridden by what's saved from the page) ----------
+// ---------- settings ----------
+// The team list comes from config.js unless it was edited in the Manage panel on this device. An edited list
+// remembers which config.js it was based on, so a later config.js change (e.g. pushed from another computer)
+// is offered instead of silently ignored. Card order and collapsed state are a separate, per-device layout.
 const normalizeTeam = t => ({
   id: t.id, name: t.name, followTeam: t.followTeam !== false,
-  players: [...(t.players || (t.player ? [t.player] : []))], collapsed: !!t.collapsed,
+  players: [...(t.players || (t.player ? [t.player] : []))],
 });
+const teamsSignature = list => JSON.stringify(list.map(normalizeTeam));
+const CONFIG_SIGNATURE = teamsSignature(CFG.teams);
+let configConflict = false; // this device's edited list predates the current config.js
+
 function storageGet(key) { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } }
 function storageSet(key, v) { try { v == null ? localStorage.removeItem(key) : localStorage.setItem(key, JSON.stringify(v)); } catch { /* private mode */ } }
-function loadTeams() {
-  const saved = storageGet(STORE_TEAMS);
-  followed = new Map((Array.isArray(saved) ? saved : CFG.teams).map(normalizeTeam).map(t => [t.id, t]));
+
+function migrateV1() {
+  const old = storageGet(STORE_TEAMS_V1);
+  if (!Array.isArray(old)) return;
+  if (!storageGet(STORE_LAYOUT))
+    storageSet(STORE_LAYOUT, { order: old.map(t => t.id) }); // cards start collapsed, so old "expanded" (the old default) isn't carried over
+  // keep the old list only if it really differs from config.js; base null = unknown, so it gets the banner
+  if (teamsSignature(old) !== CONFIG_SIGNATURE && !storageGet(STORE_TEAMS)) storageSet(STORE_TEAMS, { base: null, teams: old.map(normalizeTeam) });
+  storageSet(STORE_TEAMS_V1, null);
 }
-function saveTeams() { storageSet(STORE_TEAMS, [...followed.values()]); }
+
+function loadTeams() {
+  migrateV1();
+  const saved = storageGet(STORE_TEAMS);
+  const list = Array.isArray(saved?.teams) ? saved.teams : CFG.teams;
+  configConflict = !!saved && saved.base !== CONFIG_SIGNATURE && teamsSignature(saved.teams) !== CONFIG_SIGNATURE;
+  const layout = storageGet(STORE_LAYOUT) || {};
+  const rank = id => { const i = (layout.order || []).indexOf(id); return i < 0 ? Infinity : i; };
+  const teams = list.map(normalizeTeam).map((t, i) => ({ ...t, collapsed: !(layout.expanded || []).includes(t.id), i }))
+    .sort((a, b) => rank(a.id) - rank(b.id) || a.i - b.i); // dragged order first, new teams keep their list position
+  followed = new Map(teams.map(({ i, ...t }) => [t.id, t]));
+  renderConfigBanner();
+}
+function saveTeams() {
+  const teams = [...followed.values()].map(normalizeTeam);
+  // an edit that ends up identical to config.js just means "use config.js"
+  storageSet(STORE_TEAMS, teamsSignature(teams) === CONFIG_SIGNATURE ? null : { base: CONFIG_SIGNATURE, teams });
+  saveLayout();
+  configConflict = false;
+  renderConfigBanner();
+}
+function saveLayout() {
+  const all = [...followed.values()];
+  storageSet(STORE_LAYOUT, { order: all.map(t => t.id), expanded: all.filter(t => !t.collapsed).map(t => t.id) });
+}
+
+function renderConfigBanner() {
+  const el = document.getElementById("config-banner");
+  if (el) el.hidden = !configConflict;
+}
 
 // ---------- fetch helpers ----------
 async function api(path) {
@@ -661,7 +712,7 @@ for (const el of cardsEls()) el.addEventListener("click", async e => {
   if (!e.target.closest("[data-collapse]")) return;
   const t = followed.get(e.target.closest(".team-card").dataset.id);
   t.collapsed = !t.collapsed;
-  saveTeams();
+  saveLayout();
   replaceCard(t, await teamData(t).catch(err => ({ error: err.message })));
 });
 
@@ -689,7 +740,7 @@ for (const container of cardsEls()) container.addEventListener("pointerdown", e 
     card.classList.remove("dragging");
     const order = cardsEls().flatMap(el => [...el.querySelectorAll(".team-card")].map(c => c.dataset.id));
     followed = new Map([...order, ...followed.keys()].filter((id, i, a) => followed.has(id) && a.indexOf(id) === i).map(id => [id, followed.get(id)]));
-    saveTeams();
+    saveLayout();
   };
   document.addEventListener("pointermove", move);
   document.addEventListener("pointerup", up);
@@ -1083,7 +1134,7 @@ function teamIndex() {
 }
 
 function addFollow(id, name, asTeam) {
-  const t = followed.get(id) || normalizeTeam({ id, name, followTeam: asTeam });
+  const t = followed.get(id) || { ...normalizeTeam({ id, name, followTeam: asTeam }), collapsed: true };
   if (asTeam) t.followTeam = true;
   followed.set(id, t);
   document.getElementById("m-search").value = "";
@@ -1141,7 +1192,7 @@ document.getElementById("m-copy").addEventListener("click", async e => {
 });
 document.getElementById("m-reset").addEventListener("click", () => {
   if (!confirm("Discard the teams and players added here and go back to config.js?")) return;
-  storageSet(STORE_TEAMS, null);
+  storageSet(STORE_TEAMS, null); // card order and collapsed cards are kept
   loadTeams();
   settingsDirty = true;
   renderManage();
@@ -1170,6 +1221,16 @@ async function loadAll() {
   const n = new Date();
   document.getElementById("updated").textContent = `Updated ${pad(n.getHours())}:${pad(n.getMinutes())}`;
 }
+
+document.getElementById("config-banner").addEventListener("click", e => {
+  const b = e.target.closest("[data-config]");
+  if (!b) return;
+  if (b.dataset.config === "use") storageSet(STORE_TEAMS, null);
+  else storageSet(STORE_TEAMS, { ...storageGet(STORE_TEAMS), base: CONFIG_SIGNATURE }); // keep: stop asking until config.js changes again
+  loadTeams();
+  resolvedTeamData.clear();
+  renderTeams().then(refreshRivalViews);
+});
 
 loadTeams();
 document.getElementById("show-rivals").checked = !!CFG.showRivals;

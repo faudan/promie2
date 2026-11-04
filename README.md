@@ -19,6 +19,12 @@ their ⋮⋮ handle to reorder them, and use ▾ to collapse a card to just its 
 All of this is saved in that browser only.
 **Copy settings** gives you a `teams` block to paste into `config.js` so they stick everywhere.
 
+Each device uses `config.js` until you edit teams in Manage there. If `config.js` changes later (e.g. you
+pushed from another computer), that device shows a banner offering **Use config.js** or **Keep this
+device's list**. Card order and collapsed cards are saved per device and never block `config.js` updates.
+After a push, GitHub Pages can take a minute to deploy, and browsers may keep the old files for up to
+10 minutes, so reload again if you don't see the change.
+
 The **Competitions** chips at the top list every competition your teams are playing. Click one (or a
 competition name in a card's footer) to see its matchday (‹ › to move between rounds), standings, and top
 scorers and assists. National teams work like clubs: search "Argentina" in Manage.
