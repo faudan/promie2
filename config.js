@@ -5,15 +5,24 @@
 // Team ids come from promiedos URLs: promiedos.com.ar/team/river-plate/igi -> "igi"
 // League ids too:                    promiedos.com.ar/league/liga-profesional/hc -> "hc"
 window.TRACKER_CONFIG = {
-  teams: [
+    teams: [
     { id: "igi", name: "River Plate" },
-    // With `players`, each match shows whether they start / are on the bench / are out.
-    // `followTeam: false` = you only care about the team because of those players
-    // (shown in the "Players" row instead of "My teams").
-    { id: "bde", name: "Atlético de Madrid", followTeam: false, players: ["Julián Álvarez"] },
     { id: "bai", name: "Liverpool" },
-    { id: "bdc", name: "FC Barcelona" },
     { id: "cdhi", name: "Argentina" },
+    { id: "bdc", name: "FC Barcelona" },
+    { id: "ccf", name: "AS Roma" },
+    { id: "fde", name: "Brest" },
+    { id: "bde", name: "Atlético de Madrid", followTeam: false, players: ["Julián Álvarez"] },
+    { id: "cce", name: "Inter Milan", followTeam: false, players: ["Lautaro Martínez"] },
+    { id: "fehcj", name: "Inter Miami", followTeam: false, players: ["Lionel Messi"] },
+    { id: "gbbh", name: "Como", followTeam: false, players: ["Nicolás Paz"] },
+    { id: "bba", name: "Manchester City", followTeam: false, players: ["Enzo Fernández"] },
+    { id: "baf", name: "Manchester United", followTeam: false, players: ["Lisandro Martínez"] },
+    { id: "bag", name: "Chelsea", followTeam: false, players: ["Valentín Barco"] },
+    { id: "fagb", name: "Francia", followTeam: false, players: ["Rayan Cherki"] },
+    { id: "bdb", name: "Real Madrid", followTeam: false, players: ["Yan Diomande"] },
+    { id: "hbhb", name: "RB Leipzig" },
+    { id: "bae", name: "Arsenal", followTeam: false, players: ["Viktor Gyökeres"] },
   ],
 
   // How many upcoming matches to list per team.
@@ -42,4 +51,5 @@ window.TRACKER_CONFIG = {
 
   // Auto-refresh interval in seconds while the page is visible (0 = off).
   refreshSeconds: 120,
+
 };
