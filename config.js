@@ -28,26 +28,25 @@ window.TRACKER_CONFIG = {
   // How many upcoming matches to list per team.
   upcomingPerTeam: 3,
 
-  // Leagues whose standings you want at hand (bottom "Standings" section). They also set which tables
-  // count for a team's footer and rivals, e.g. River: its Clausura group and the Tabla Anual.
+  // Default range of the "Next matches" section: 14 (2 weeks) or 30 (1 month). Its dropdown overrides it per device.
+  nextMatchesDays: 14,
+
+  // Which tables to use for these leagues in Standings, a team's footer and its rivals, e.g. River: its Clausura group and the Tabla Anual.
   //   tables: which tables to show. "current" = the tournament in progress (first group on
   //           promiedos, e.g. Clausura); any other string matches a table/group name.
   leagues: [
     { id: "hc", name: "Liga Profesional", tables: ["current", "Tabla Anual"] },
   ],
 
-  // Rivals of a followed team = teams within `places` positions above/below it in each of its tables.
-  // Pick whose rivals to see in the "Rivals" section; the day view can include their matches.
-  rivals: { places: 3 },
+  // Rivals of a followed team = teams within `points` points above/below it in each of its tables.
+  // Pick the team in the "Standings" section; the day view can include its rivals' matches.
+  rivals: { points: 3 },
 
   // Leagues scanned to build the "add team" search index (cached in the browser for a week).
   // The last ones are national-team competitions (qualifiers, World Cup, Copa América, Nations League).
   searchLeagues: ["hc", "ebj", "h", "bb", "bh", "cf", "df", "hd", "bbd", "gbh", "gcb", "gca", "bdf", "beb", "bae",
                   "bac", "dij", "fhc", "fhd", "hgif",
                   "gbd", "fecb", "fjda", "fjf", "habg"],
-
-  // Include the selected team's rivals' matches in the day view by default.
-  showRivals: true,
 
   // Auto-refresh interval in seconds while the page is visible (0 = off).
   refreshSeconds: 120,

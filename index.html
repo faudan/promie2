@@ -173,11 +173,43 @@
   .game-row .teams .vs { color: var(--muted); font-size: 12px; }
   .game-row .score { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
   .meta { color: var(--muted); font-size: 12px; }
+  /* goal summary: an inset panel, one line per team that scored */
+  .scorers { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 8px; align-items: baseline;
+             margin-top: 6px; padding: 6px 9px; font-size: 12px; background: var(--card);
+             border: 1px solid var(--line); border-left: 3px solid var(--ok); border-radius: 6px; }
+  .scorers .side { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+  .scorers .side::before { content: "⚽"; font-size: 11px; }
+  .scorers .list { display: flex; flex-wrap: wrap; gap: 1px 12px; }
+  .scorers .goal { white-space: nowrap; }
+  .scorers .min { color: var(--muted); font-variant-numeric: tabular-nums; }
   .tv { font-size: 12px; color: var(--muted); }
   .tv::before { content: "📺 "; }
   .league-name { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin: 12px 0 4px; font-weight: 600;
                  text-transform: uppercase; letter-spacing: .03em; }
   .league-name:first-child { margin-top: 0; }
+  h2.with-control { display: flex; align-items: center; gap: 8px; }
+  h2.with-control select { margin-left: auto; }
+  select { font: inherit; font-size: 12.5px; text-transform: none; letter-spacing: 0; color: var(--text);
+           background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; }
+  #next { max-height: min(70vh, 640px); overflow-y: auto; margin-right: -6px; padding-right: 6px; }
+  .league-name .stage { font-weight: 500; text-transform: none; letter-spacing: 0; }
+  .next-day { font-weight: 700; font-size: 13.5px; margin: 16px 0 2px; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
+  .next-day:first-child { margin-top: 0; }
+  .next-day.today { color: var(--accent); }
+  .next-day + .league-name { margin-top: 6px; }
+  .st-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 4px 0 10px; }
+  .st-head h3 { margin: 0; }
+  .st-head .spacer { flex: 1; }
+  .rivals-btn { margin-top: 14px; display: inline-flex; align-items: center; gap: 6px; }
+  .rivals-btn .chev { display: inline-block; transition: transform .15s; }
+  .rivals-btn[aria-expanded="false"] .chev { transform: rotate(-90deg); }
+  #round { margin-top: 10px; }
+  .ko-title { margin: 18px 0 8px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .ko-rounds .rival-chip:disabled { opacity: .45; }
+  .ko-games { display: grid; gap: 2px 14px; grid-template-columns: repeat(auto-fill, minmax(min(380px, 100%), 1fr)); align-items: start; }
+  .ko-games .game-row + .game-row { margin-top: 0; }
+  .game-row .teams .through { color: var(--ok); font-weight: 700; font-size: 12px; }
+  .game-row .teams .tpos { font-size: 11.5px; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
   /* ----- standings ----- */
   .tables { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); }
@@ -191,6 +223,9 @@
   tr.rival td { background: var(--rival-bg); }
   tr.rival td.name { font-weight: 600; }
   .rival-picker { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; }
+  #team-bar-section .rival-picker { margin: 0; }
+  .bar-sep { width: 1px; align-self: stretch; min-height: 22px; background: var(--line); margin: 0 6px; }
+  .st-head .st-team { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 15px; }
   .rival-picker .label { font-size: 12.5px; color: var(--muted); margin-right: 2px; }
   .rival-chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 3px 11px 3px 5px; background: var(--card); }
   .rival-chip[aria-pressed="true"] { background: var(--follow-bg); border-color: var(--accent); font-weight: 600; }
@@ -251,6 +286,9 @@
     <button class="sec-toggle" aria-expanded="true">Players<span class="count"></span><span class="action"><span class="chev">▾</span></span></button>
     <div id="players" class="team-cards" data-section="player"></div>
   </section>
+  <section class="wide bare" id="team-bar-section">
+    <div class="rival-picker" id="rival-picker"></div>
+  </section>
   <section>
     <h2>Matches by day</h2>
     <div class="day-nav">
@@ -258,18 +296,19 @@
       <button data-shift="0">Today</button>
       <button data-shift="1">→</button>
       <span class="label" id="day-label"></span>
-      <label id="show-rivals-label"><input type="checkbox" id="show-rivals"> <span>rivals</span></label>
+      <label id="show-rivals-label"><input type="checkbox" id="show-rivals"> <span>Display competing teams fixtures</span></label>
     </div>
     <div id="day"><span class="muted">Loading…</span></div>
   </section>
   <section>
-    <h2>Rivals</h2>
-    <div class="rival-picker" id="rival-picker"></div>
-    <div id="round"><span class="muted">Loading…</span></div>
+    <h2 class="with-control">Next matches<select id="next-range" title="How far ahead to look"></select></h2>
+    <div id="next"><span class="muted">Loading…</span></div>
   </section>
-  <section class="wide">
+  <section class="wide" id="standings-section">
     <h2>Standings</h2>
     <div id="standings"><span class="muted">Loading…</span></div>
+    <button class="rivals-btn" id="rivals-btn" aria-expanded="false" hidden><span class="chev">▾</span><span>Show competing teams fixtures</span></button>
+    <div id="round" hidden></div>
   </section>
 </main>
 
@@ -288,6 +327,9 @@
   <div class="dlg-foot">
     <button id="m-copy" title="Copy the teams list as a config.js snippet">Copy settings</button>
     <button id="m-reset" title="Forget changes made here and use config.js">Reset to config.js</button>
+    <button id="m-export" title="Download your teams, players and layout as a file">Export…</button>
+    <button id="m-import" title="Restore teams, players and layout from an exported file">Import…</button>
+    <input type="file" id="m-import-file" accept="application/json,.json" hidden>
     <span class="spacer"></span>
     <button class="primary" data-close>Done</button>
   </div>
@@ -309,12 +351,14 @@ const STORE_TEAMS = "tracker.teams.v2";    // {base, teams}: only written by edi
 const STORE_LAYOUT = "tracker.layout.v1";  // {order: [ids], expanded: [ids]}: card order, and cards opened (they start collapsed)
 const STORE_FOLDED = "tracker.foldedSections.v1";
 const STORE_RIVAL_OF = "tracker.rivalOf.v1";
+const STORE_NEXT_DAYS = "tracker.nextDays.v1";
 const STORE_INDEX = `tracker.teamIndex.v1:${(CFG.searchLeagues || []).join(",")}`; // rebuilt when the league list changes
 const INDEX_MAX_AGE = 7 * 864e5;
 
 let followed = new Map();  // team id -> {id, name, followTeam, players: [], collapsed}; Map order = card order
 let rivals = new Map();    // rivals of the selected team: team id -> {name, reasons: [{comp, text: "5º Clausura · Grupo B (−1 pts)"}]}
-let rivalOf = null;        // followed team whose rivals are shown (null = none)
+let rivalOf = null;        // followed team whose standings and rivals are shown (saved; defaults to the first team)
+let focusTeam = null;      // team picked in the top bar: also filters Next matches (null = "All", on every page load)
 let dayOffset = 0;
 const gamecenterCache = new Map();
 const leagueCache = new Map();
@@ -393,7 +437,7 @@ function gamecenter(id, fresh = false) {
   if (fresh) gamecenterCache.delete(id);
   return cached(gamecenterCache, id, () => api(`/gamecenter/${id}`).then(d => d.game));
 }
-const leagueTables = id => cached(leagueCache, id, () => api(`/league/tables_and_fixtures/${id}`));
+const leagueTables = id => cached(leagueCache, id, () => api(`/league/tables_and_fixtures/${id}`).then(d => { indexStandings(id, d); return d; }));
 
 // ---------- formatting ----------
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -543,12 +587,16 @@ async function loadTeamData(t) {
     if (!comps.has(l.id)) comps.set(l.id, { id: l.id, name: l.name });
     comps.get(l.id).round ??= g.stage_round_name;
   }
+  for (const { g, gc } of games) if (gc?.league?.id) gameLeague.set(g.id, { id: gc.league.id, name: gc.league.name, stage: gc.stage_round_name });
   if (!comps.size && data.main_league?.id) comps.set(data.main_league.id, { id: data.main_league.id, name: data.main_league.name });
   const [positions, playerStats] = await Promise.all([
     teamPositions(t.id, [...comps.values()]),
     playerCompStats(t, data.stats?.filters || [], [...comps.values()]),
   ]);
-  return { comp: data.competitor || {}, games: games.slice(0, shown), positions, playerStats };
+  // `upcoming` = the first few, with gamecenter; `next` = the team's whole list of upcoming matches (no gamecenter)
+  return { comp: data.competitor || {}, games: games.slice(0, shown), upcoming: games,
+           next: [...todays, ...upcoming], last: (data.games?.last?.rows || []).map(r => r.game).filter(Boolean),
+           mainLeague: data.main_league?.id, positions, playerStats };
 }
 
 // Goals/assists of the followed players, per competition. The team's stats come in "filters" named like
@@ -664,7 +712,15 @@ const resolvedTeamData = new Map(); // team id -> loaded data, for the competiti
 function replaceCard(t, data) {
   const el = document.querySelector(`.team-card[data-id="${CSS.escape(t.id)}"]`);
   if (el) el.outerHTML = cardHtml(t, data);
-  if (data && !data.error) { resolvedTeamData.set(t.id, data); renderCompBar(); renderRivalPicker(); }
+  if (!data || data.error) return;
+  resolvedTeamData.set(t.id, data);
+  renderCompBar();
+  const before = rivalOf;
+  renderRivalPicker();
+  // the selected team's rivals are known as soon as its data is in: don't wait for every card to load,
+  // or the chip shows as selected while the day view toggle and standings have no rivals yet
+  if (rivalOf && (rivalOf !== before || t.id === rivalOf)) refreshRivalViews();
+  renderNext();
 }
 
 function renderCompBar() {
@@ -748,7 +804,6 @@ for (const container of cardsEls()) container.addEventListener("pointerdown", e 
 });
 
 // ---------- Standings + rivals ----------
-let leagueData = null; // null until loaded
 
 function pickTables(data, wanted) {
   const groups = data.tables_groups || [];
@@ -768,32 +823,39 @@ function pickTables(data, wanted) {
   return out;
 }
 
-async function loadStandings() {
-  leagueData = await Promise.all((CFG.leagues || []).map(async lg => {
-    try {
-      const data = await leagueTables(lg.id);
-      return { lg, data, tables: pickTables(data, lg.tables || ["current"]) };
-    } catch (e) {
-      return { lg, error: e.message };
-    }
-  }));
+// The tables a competition shows: for config.js leagues, its `tables`; otherwise the current phase
+function compTableList(id, data) {
+  const cfg = (CFG.leagues || []).find(l => l.id === id);
+  if (cfg) return pickTables(data, cfg.tables || ["current"]);
+  const g = (data.tables_groups || []).find(g => g.tables?.length && !isRelegationTable(g));
+  return g ? g.tables.map(t => ({ title: g.tables.length > 1 ? t.name : "", table: t.table })) : [];
 }
 
-// Rivals = teams within CFG.rivals.places positions of the selected team, in every table it is in
+// competition id -> Map(team id -> {num, pts, title}): a team's place in the first of those tables it's in
+// (e.g. River: its Clausura group, not the Tabla Anual). Shown next to team names in match rows.
+const standingIndex = new Map();
+function indexStandings(id, data) {
+  const idx = new Map();
+  for (const { title, table } of compTableList(id, data)) for (const r of table.rows || []) {
+    const o = r.entity?.object;
+    if (o?.id && !idx.has(o.id)) idx.set(o.id, { num: r.num, pts: pointsOf(r), title });
+  }
+  standingIndex.set(id, idx);
+}
+
+// Rivals = teams within CFG.rivals.points points (above or below) of the selected team, in every table it is in
 // (the same tables its card footer shows, e.g. River: its Clausura group and the Tabla Anual).
 const pointsOf = row => +(row.values?.find(v => v.key === "Points")?.value || 0);
 const rivalCandidates = () => [...followed.values()].filter(t => resolvedTeamData.get(t.id)?.positions?.some(p => p.rows.length));
 
 function computeRivals() {
   rivals = new Map();
-  const range = CFG.rivals?.places ?? 3;
+  const range = CFG.rivals?.points ?? 3;
   for (const p of resolvedTeamData.get(rivalOf)?.positions || []) for (const { title, table, row } of p.rows) {
-    const rows = table.rows || [];
-    const i = rows.indexOf(row);
-    for (const r of rows.slice(Math.max(0, i - range), i + range + 1)) {
+    for (const r of table.rows || []) {
       const o = r.entity?.object;
-      if (!o || o.id === rivalOf) continue;
       const diff = pointsOf(r) - pointsOf(row);
+      if (!o || o.id === rivalOf || Math.abs(diff) > range) continue;
       const entry = rivals.get(o.id) || { name: o.name, reasons: [] };
       entry.reasons.push({ comp: p.id, text: `${r.num}º ${title || p.name} (${diff > 0 ? "+" : diff < 0 ? "−" : "±"}${Math.abs(diff)} pts)` });
       rivals.set(o.id, entry);
@@ -802,18 +864,26 @@ function computeRivals() {
 }
 
 function renderRivalPicker() {
-  const candidates = rivalCandidates();
+  const candidates = rivalCandidates(); // teams with a table: the default standings team is one of these
   const saved = storageGet(STORE_RIVAL_OF);
   // default to the first followed team (in card order) that has a table, waiting for teams still loading
-  // so the default doesn't depend on which loads first; an explicit "none" ("") is respected
+  // so the default doesn't depend on which loads first; a team picked in the bar is kept even without a table
   const fallback = [...followed.values()].find(t => t.followTeam && (!resolvedTeamData.has(t.id) || candidates.includes(t)));
-  rivalOf = saved === "" ? null : candidates.find(t => t.id === saved)?.id ?? fallback?.id ?? candidates[0]?.id ?? null;
-  const name = t => resolvedTeamData.get(t.id)?.comp?.short_name || t.name;
-  document.getElementById("rival-picker").innerHTML = candidates.length ? `<span class="label">Rivals of</span>` +
-    candidates.map(t => `<button class="rival-chip" data-rival-of="${esc(t.id)}" aria-pressed="${t.id === rivalOf}">${teamLogo(t.id, "sm")}${esc(name(t))}</button>`).join("") : "";
-  const label = document.getElementById("show-rivals-label");
-  label.hidden = !rivalOf;
-  label.querySelector("span").textContent = rivalOf ? `rivals of ${name(followed.get(rivalOf))}` : "rivals";
+  rivalOf = (followed.has(saved) ? saved : null) ?? fallback?.id ?? candidates[0]?.id ?? null;
+  if (focusTeam && !followed.has(focusTeam)) focusTeam = null;
+  // every followed team: teams first, then a separator and the teams followed for their players
+  const chip = (t, label) => `<button class="rival-chip" data-rival-of="${esc(t.id)}" aria-pressed="${t.id === focusTeam}">${teamLogo(t.id, "sm")}${label}</button>`;
+  const all = [...followed.values()];
+  const teams = all.filter(t => t.followTeam), players = all.filter(t => !t.followTeam);
+  const shortName = t => esc(resolvedTeamData.get(t.id)?.comp?.short_name || t.name);
+  document.getElementById("rival-picker").innerHTML = !all.length ? "" :
+    `<span class="label">Team</span><button class="rival-chip" data-rival-of="" aria-pressed="${!focusTeam}">All</button>` +
+    teams.map(t => chip(t, shortName(t))).join("") +
+    (players.length ? `<span class="bar-sep" aria-hidden="true"></span><span class="label">Players</span>` +
+      players.map(t => chip(t, shortName(t))).join("") : "");
+  const hasTable = candidates.some(t => t.id === rivalOf);
+  document.getElementById("show-rivals-label").hidden = !hasTable;
+  document.getElementById("rivals-btn").hidden = !hasTable;
 }
 
 function refreshRivalViews() {
@@ -824,11 +894,24 @@ function refreshRivalViews() {
   return renderDay();
 }
 
+// top team bar: a team shows its standings/rivals and filters Next matches to it; "All" (or clicking the
+// picked team again) clears the filter, and the standings stay on the last team picked
 document.getElementById("rival-picker").addEventListener("click", e => {
   const b = e.target.closest("[data-rival-of]");
   if (!b) return;
-  storageSet(STORE_RIVAL_OF, b.dataset.rivalOf === rivalOf ? "" : b.dataset.rivalOf); // clicking the active one clears it
-  refreshRivalViews();
+  const id = b.dataset.rivalOf;
+  focusTeam = !id || id === focusTeam ? null : id;
+  renderNext();
+  if (focusTeam && focusTeam !== rivalOf) { storageSet(STORE_RIVAL_OF, focusTeam); refreshRivalViews(); }
+  else renderRivalPicker();
+});
+// competing teams' fixtures (the current round around the selected team): hidden on every page load
+const rivalsBtn = document.getElementById("rivals-btn");
+rivalsBtn.addEventListener("click", () => {
+  const open = rivalsBtn.getAttribute("aria-expanded") !== "true";
+  rivalsBtn.setAttribute("aria-expanded", String(open));
+  rivalsBtn.lastElementChild.textContent = `${open ? "Hide" : "Show"} competing teams fixtures`;
+  document.getElementById("round").hidden = !open;
 });
 
 function tableHtml(title, table, compId) {
@@ -850,21 +933,125 @@ function tableHtml(title, table, compId) {
     <tbody>${rows}</tbody></table>${legend ? `<div class="legend">${legend}</div>` : ""}</div>`;
 }
 
-function renderStandings() {
-  const el = document.getElementById("standings");
-  if (!leagueData) { el.innerHTML = `<span class="muted">Loading…</span>`; return; }
-  el.innerHTML = leagueData.map(({ lg, data, tables, error }) => {
-    if (error) return `<h3>${esc(lg.name)}</h3><div class="err">${esc(error)}</div>`;
-    const blocks = tables.map(({ title, table }) => tableHtml(title, table, lg.id)).join("");
-    return `<h3>${leagueLogo(lg.id, "")}<a href="${SITE}/league/${esc(data.league?.url_name || "x")}/${esc(lg.id)}" target="_blank" rel="noopener">${esc(data.league?.name || lg.name)}</a></h3>
-      <div class="tables">${blocks || '<span class="muted">No matching tables — check `tables` in config.js.</span>'}</div>`;
-  }).join("") || `<span class="muted">No leagues configured.</span>`;
+// The selected team's competitions: its footer ones, plus those of its upcoming and recent matches
+// (cups show up there). The domestic league (promiedos' main league for the team) comes first.
+const stComp = new Map(); // team id -> competition picked in the dropdown (this page load only)
+function teamComps(t) {
+  const d = resolvedTeamData.get(t.id);
+  if (!d) return { comps: [], pending: [] };
+  const isFriendly = name => /amistos/i.test(name || ""); // friendlies have no table
+  const comps = new Map(d.positions.filter(p => !isFriendly(p.name)).map(p => [p.id, p.name]));
+  const pending = [];
+  for (const g of [...d.next.map(m => m.g).slice(0, 12), ...d.last.slice(-10)]) { // "last" runs oldest → newest
+    const lg = gameLeague.get(g.id);
+    if (!lg) pending.push(g.id);
+    else if (lg.id && !comps.has(lg.id) && !isFriendly(lg.name)) comps.set(lg.id, lg.name);
+  }
+  const list = [...comps].map(([id, name]) => ({ id, name }));
+  list.sort((a, b) => (b.id === d.mainLeague) - (a.id === d.mainLeague));
+  return { comps: list, pending };
 }
+
+// Knockout rounds: promiedos has no bracket, only a list of rounds (each with its matches). The current
+// knockout stage = the rounds after the last league-phase round (for a cup, all of them). This skips e.g.
+// Liga Profesional's Apertura playoffs, listed before the Clausura matchdays.
+const LEAGUE_PHASE = /fecha|jornada|matchday|temporada regular|fase de (grupos|liga)|grupo|league phase/i;
+function knockoutRounds(data) {
+  const f = (data.games?.filters || []).filter(x => x.key !== "latest");
+  const lastLeague = f.reduce((acc, x, i) => LEAGUE_PHASE.test(x.name) ? i : acc, -1);
+  return f.slice(lastLeague + 1);
+}
+const roundGames = (id, r) => r.games ? Promise.resolve(r.games)
+  : cached(roundCache, `${id}/${r.key}`, () => api(`/league/games/${id}/${r.key}`)).then(d => d.games || []);
+const koPick = new Map(); // `${team}|${comp}` -> round index picked (this page load only)
+
+async function knockoutHtml(id, team, rounds) {
+  const lists = await Promise.all(rounds.map(r => roundGames(id, r).catch(() => [])));
+  const has = (games, tid) => games.some(g => g.teams.some(t => t.id === tid));
+  // default: the latest round the team plays in, else the latest round with matches
+  const lastIdx = pred => lists.reduce((acc, games, i) => pred(games) ? i : acc, -1);
+  let pick = koPick.get(`${team.id}|${id}`);
+  if (!(pick >= 0 && pick < rounds.length)) pick = Math.max(lastIdx(gs => has(gs, team.id)), lastIdx(gs => gs.length), 0);
+  const chips = rounds.map((r, i) => `<button class="rival-chip" data-ko="${i}" aria-pressed="${i === pick}" ${lists[i].length ? "" : "disabled"}>
+    ${esc(r.name)}${has(lists[i], team.id) ? ` ${teamLogo(team.id, "sm")}` : ""}</button>`).join("");
+  const games = [...lists[pick]].sort((a, b) =>
+    has([b], team.id) - has([a], team.id) || (parseStart(a.start_time) || 0) - (parseStart(b.start_time) || 0));
+  return `<div class="rival-picker ko-rounds">${chips}</div>
+    <div class="ko-games">${games.map(g => gameRow(g, { showDay: true, compId: id, ko: true })).join("") || `<div class="muted">No matches listed for this round yet.</div>`}</div>`;
+}
+
+let standingsToken = 0;
+async function renderStandings() {
+  const el = document.getElementById("standings");
+  const team = followed.get(rivalOf);
+  if (!team) { el.innerHTML = `<span class="muted">${followed.size ? "Loading…" : "No teams yet."}</span>`; return; }
+  const { comps, pending } = teamComps(team);
+  if (pending.length) loadGameLeagues(pending, renderStandings);
+  const d = resolvedTeamData.get(team.id);
+  const withTable = d.positions.find(p => p.rows.length)?.id;
+  const selected = comps.find(c => c.id === stComp.get(team.id)) || comps.find(c => c.id === d.mainLeague) || comps.find(c => c.id === withTable) || comps[0];
+  if (!selected) {
+    el.innerHTML = `<div class="st-head"><span class="st-team">${teamLogo(team.id, "md")}${esc(d.comp?.name || team.name)}</span></div>
+      <span class="muted">No table for ${esc(d.comp?.name || team.name)} right now${pending.length ? " (still checking its matches…)" : ""}.</span>`;
+    return;
+  }
+  const token = ++standingsToken;
+  const head = `<div class="st-head"><span class="st-team">${teamLogo(team.id, "md")}${esc(d.comp?.name || team.name)}</span>${leagueLogo(selected.id, "md")}
+    <select id="st-comp" title="Competition">${comps.map(c => `<option value="${esc(c.id)}"${c.id === selected.id ? " selected" : ""}>${esc(c.name)}</option>`).join("")}</select>
+    <span class="spacer"></span><a href="#" data-comp="${esc(selected.id)}" class="meta">Matchday, scorers…</a></div>`;
+  if (!el.querySelector(".st-body")) el.innerHTML = head + `<div class="muted">Loading…</div>`;
+  let data;
+  try { data = await leagueTables(selected.id); } catch (e) { if (token === standingsToken) el.innerHTML = head + `<div class="err">${esc(e.message)}</div>`; return; }
+  if (token !== standingsToken) return; // selection changed while loading
+  const tables = compTableList(selected.id, data).map(({ title, table }) => tableHtml(title, table, selected.id)).join("");
+  const rounds = knockoutRounds(data);
+  let ko = "";
+  if (rounds.length) {
+    try { ko = await knockoutHtml(selected.id, team, rounds); } catch (e) { ko = `<div class="err">${esc(e.message)}</div>`; }
+    if (token !== standingsToken) return;
+  }
+  el.innerHTML = head + `<div class="st-body">
+    ${tables ? `<div class="tables">${tables}</div>` : ""}
+    ${ko ? `${tables ? `<h4 class="ko-title">Knockout stage</h4>` : ""}${ko}` : ""}
+    ${!tables && !ko ? `<span class="muted">No table or knockout rounds listed for ${esc(data.league?.name || selected.name)}.</span>` : ""}</div>`;
+}
+document.getElementById("standings").addEventListener("click", e => {
+  const b = e.target.closest("[data-ko]");
+  if (!b) return;
+  koPick.set(`${rivalOf}|${document.getElementById("st-comp").value}`, +b.dataset.ko);
+  renderStandings();
+});
+document.getElementById("standings").addEventListener("change", e => {
+  if (e.target.id !== "st-comp") return;
+  stComp.set(rivalOf, e.target.value);
+  renderStandings();
+});
 
 const isRival = (teamId, compId) => !!rivals.get(teamId)?.reasons.some(r => !compId || r.comp === compId);
 function rivalNote(g, compId) {
   return g.teams.filter(t => isRival(t.id, compId))
     .map(t => `${t.short_name || t.name}: ${rivals.get(t.id).reasons.filter(r => !compId || r.comp === compId).map(r => r.text).join(", ")}`).join(" · ");
+}
+
+// one line per team that scored: "⚽ River  Beltrán 12', 76' (pen)  Correa 90'+1"; followed players get a ★
+const GOAL_TYPES = { "Pen": "pen", "E.C": "og" };
+function scorersHtml(g) {
+  const lines = g.teams.map(t => {
+    if (!t.goals?.length) return "";
+    const byPlayer = new Map();
+    for (const goal of t.goals) {
+      const key = goal.player_name || goal.player_sname;
+      if (!byPlayer.has(key)) byPlayer.set(key, { name: goal.player_sname || key, full: key, times: [] });
+      const type = GOAL_TYPES[goal.goal_type] ?? goal.goal_type;
+      byPlayer.get(key).times.push(`${goal.time_to_display || Math.round(goal.time) + "'"}${type ? ` (${type})` : ""}`);
+    }
+    const scorers = [...byPlayer.values()].map(p => {
+      const name = isFollowedPlayer(p.full) ? `<b class="pos-player">${esc(p.name)}</b>` : esc(p.name);
+      return `<span class="goal">${name} <span class="min">${esc(p.times.join(", "))}</span></span>`;
+    }).join(" ");
+    return `<span class="side">${esc(t.short_name || t.name)}</span><span class="list">${scorers}</span>`;
+  }).join("");
+  return lines ? `<div class="scorers">${lines}</div>` : "";
 }
 
 function gameRow(g, opts = {}) {
@@ -879,17 +1066,101 @@ function gameRow(g, opts = {}) {
   const note = rivalGame ? rivalNote(g, opts.compId) : "";
   const team = t => {
     const label = esc(t.short_name || t.name);
-    return `<span class="t">${teamLogo(t.id, "sm")}${followed.has(t.id) ? `<strong>${label}</strong>` : label}</span>`;
+    const pos = opts.compId && standingIndex.get(opts.compId)?.get(t.id);
+    const posTxt = pos ? `<span class="tpos" title="${esc(pos.title)}">${pos.num}º · ${pos.pts} pts</span>` : "";
+    const through = opts.ko && g.to_qualify > 0 && g.teams[g.to_qualify - 1] === t ? `<span class="through" title="Goes through">✓</span>` : "";
+    return `<span class="t">${teamLogo(t.id, "sm")}${followed.has(t.id) ? `<strong>${label}</strong>` : label}${posTxt}${through}</span>`;
   };
   return `<div class="game-row ${isFollow ? "follow" : rivalGame ? "rival" : ""}${opts.showDay ? " with-day" : ""}" ${isFollow ? `data-game="${esc(g.id)}"` : ""}>
     <div class="when"><b>${w.time}</b>${opts.showDay ? w.day : ""}</div>
     <div><a class="teams" href="${gameUrl(g)}" target="_blank" rel="noopener">${team(g.teams[0])}<span class="vs">vs</span>${team(g.teams[1])}</a>
       ${tv.length ? `<div class="tv">${esc(tv.join(", "))}</div>` : ""}
       ${note ? `<div class="meta">${esc(note)}</div>` : ""}
-      <div class="badges"></div></div>
+      ${opts.scorers ? scorersHtml(g) : ""}
+      <div class="badges">${opts.badges || ""}</div></div>
     <div class="score">${right}</div>
   </div>`;
 }
+
+// stage of a game: matchday ("Fecha 10") from the game itself, or for cups ("Cuarta Ronda") from its gamecenter
+const stageOf = g => g.stage_round_name || gameLeague.get(g.id)?.stage || "";
+const stagesText = games => [...new Set(games.map(stageOf).filter(Boolean))].join(" / ");
+const leagueHeader = (lg, games, link = true) => {
+  const stage = stagesText(games);
+  const name = `${leagueLogo(lg.id)}${esc(lg.name)}`;
+  return `<div class="league-name">${link && lg.id && lg.id !== "?" ? `<a href="#" data-comp="${esc(lg.id)}" style="display:contents">${name}</a>` : name}${stage ? `<span class="stage">· ${esc(stage)}</span>` : ""}</div>`;
+};
+
+// ---------- Next matches: upcoming matches of all followed teams, by day and competition ----------
+// Covers the chosen range (2 weeks / 1 month). A team's "next" list has no competition, so games past the
+// ones loaded for its card get it from their gamecenter, fetched once and kept across auto-refreshes.
+const NEXT_RANGES = [[14, "2 weeks"], [30, "1 month"]];
+const gameLeague = new Map(); // game id -> {id, name, stage}; not cleared on refresh, a fixture's competition doesn't change
+const gameLeagueLoading = new Set();
+const nextDays = () => { const v = +storageGet(STORE_NEXT_DAYS); return NEXT_RANGES.some(([d]) => d === v) ? v : CFG.nextMatchesDays ?? 14; };
+
+async function loadGameLeagues(ids, then) {
+  const queue = ids.filter(id => !gameLeagueLoading.has(id));
+  if (!queue.length) return;
+  queue.forEach(id => gameLeagueLoading.add(id));
+  const worker = async () => {
+    for (let id; (id = queue.shift());) {
+      try { const gc = await gamecenter(id), l = gc.league; gameLeague.set(id, l?.id ? { id: l.id, name: l.name, stage: gc.stage_round_name } : { id: "", name: "Other" }); }
+      catch { gameLeague.set(id, { id: "", name: "Other" }); }
+      gameLeagueLoading.delete(id);
+    }
+  };
+  await Promise.all(Array.from({ length: 6 }, worker));
+  then();
+}
+
+function renderNext() {
+  const el = document.getElementById("next");
+  const teams = [...followed.values()].filter(t => !focusTeam || t.id === focusTeam);
+  const loaded = teams.map(t => resolvedTeamData.get(t.id)).filter(Boolean);
+  if (!loaded.length) { el.innerHTML = `<span class="muted">${teams.length ? "Loading…" : "No teams yet."}</span>`; return; }
+  const limit = new Date(); limit.setHours(0, 0, 0, 0); limit.setDate(limit.getDate() + nextDays() + 1);
+  const byId = new Map();
+  for (const d of loaded) for (const m of [...d.upcoming, ...d.next]) { // the ones with gamecenter come first and win
+    const start = parseStart(m.g.start_time);
+    if (byId.has(m.g.id) || statusInfo(m.gc || m.g).kind === "finished" || (start && start >= limit)) continue;
+    if (m.gc?.league?.id) gameLeague.set(m.g.id, { id: m.gc.league.id, name: m.gc.league.name, stage: m.gc.stage_round_name });
+    byId.set(m.g.id, { ...m, start });
+  }
+  const list = [...byId.values()].sort((a, b) => (a.start || 0) - (b.start || 0));
+  const missing = list.filter(m => !gameLeague.has(m.g.id)).map(m => m.g.id);
+  const days = new Map(); // day label -> Map(league id -> {league, games})
+  for (const m of list) {
+    const w = fmtWhen(m.g.start_time);
+    const dayKey = w.day || "Date to be confirmed";
+    if (!days.has(dayKey)) days.set(dayKey, { today: w.diff === 0, leagues: new Map() });
+    const lg = gameLeague.get(m.g.id) || { id: "?", name: "Loading competition…" };
+    const leagues = days.get(dayKey).leagues;
+    if (!leagues.has(lg.id)) leagues.set(lg.id, { lg, games: [] });
+    leagues.get(lg.id).games.push(m);
+  }
+  const pending = teams.length - loaded.length;
+  const scroll = el.scrollTop;
+  el.innerHTML = [...days].map(([day, { today, leagues }]) =>
+    `<div class="next-day${today ? " today" : ""}">${esc(day)}</div>` + [...leagues.values()].map(({ lg, games }) =>
+      leagueHeader(lg, games.map(m => m.g)) +
+      games.map(({ g, gc }) => gameRow(gc?.status ? { ...g, status: gc.status, scores: gc.scores ?? g.scores } : g,
+        { badges: gc ? playerBadgesFor(g, gc) : "", compId: lg.id })).join("")).join("")).join("")
+    || `<div class="muted">No upcoming matches in the next ${esc(NEXT_RANGES.find(([d]) => d === nextDays())?.[1] || nextDays() + " days")}.</div>`;
+  if (pending) el.insertAdjacentHTML("beforeend", `<div class="meta" style="margin-top:8px">Loading ${pending} more team${pending > 1 ? "s" : ""}…</div>`);
+  el.scrollTop = scroll;
+  if (missing.length) loadGameLeagues(missing, renderNext);
+  const noTable = [...new Set(list.map(m => gameLeague.get(m.g.id)?.id))].filter(id => id && !standingIndex.has(id) && !standingsLoading.has(id));
+  noTable.forEach(id => standingsLoading.add(id));
+  if (noTable.length) Promise.all(noTable.map(id => leagueTables(id).catch(() => standingIndex.set(id, new Map()))))
+    .finally(() => { noTable.forEach(id => standingsLoading.delete(id)); renderNext(); });
+}
+const standingsLoading = new Set();
+
+const nextRangeSel = document.getElementById("next-range");
+nextRangeSel.innerHTML = NEXT_RANGES.map(([d, label]) => `<option value="${d}">${label}</option>`).join("");
+nextRangeSel.value = String(nextDays());
+nextRangeSel.addEventListener("change", () => { storageSet(STORE_NEXT_DAYS, +nextRangeSel.value); renderNext(); });
 
 // ---------- Day view ----------
 async function renderDay() {
@@ -900,6 +1171,11 @@ async function renderDay() {
   const withRivals = !!rivalOf && document.getElementById("show-rivals").checked;
   try {
     const data = await api(`/games/${apiDate(d)}`);
+    const shownLeagues = (data.leagues || []).filter(lg => (lg.games || []).some(g => g.teams.some(t => followed.has(t.id) || (withRivals && isRival(t.id, lg.id)))));
+    // cup games have no stage in the day feed: get it from their gamecenter (once, kept across refreshes)
+    const noStage = shownLeagues.flatMap(lg => lg.games).filter(g => g.teams.some(t => followed.has(t.id) || (withRivals && isRival(t.id)))).filter(g => !g.stage_round_name && !gameLeague.has(g.id)).map(g => g.id);
+    await Promise.all([...shownLeagues.map(lg => leagueTables(lg.id).catch(() => standingIndex.set(lg.id, new Map()))),
+      loadGameLeagues(noStage, () => {})]);
     const sections = [];
     const playerGames = [];
     for (const lg of data.leagues || []) {
@@ -907,7 +1183,7 @@ async function renderDay() {
       if (!games.length) continue;
       games.sort((a, b) => (parseStart(a.start_time) || 0) - (parseStart(b.start_time) || 0));
       games.forEach(g => { if (g.teams.some(t => followed.get(t.id)?.players.length)) playerGames.push(g); });
-      sections.push(`<div class="league-name">${leagueLogo(lg.id)}${esc(lg.name)}</div>` + games.map(g => gameRow(g, { compId: lg.id })).join(""));
+      sections.push(leagueHeader(lg, games) + games.map(g => gameRow(g, { compId: lg.id, scorers: true })).join(""));
     }
     el.innerHTML = sections.join("") || `<div class="muted">Nothing of yours ${dayOffset === 0 ? "today" : "this day"}.</div>`;
     // fill in player availability for matches that have a watched player
@@ -929,10 +1205,10 @@ async function renderRound() {
   const el = document.getElementById("round");
   const team = followed.get(rivalOf);
   if (!team) {
-    el.innerHTML = `<span class="muted">${rivalCandidates().length ? "Pick a team to see the teams around it." : "Loading…"}</span>`;
+    el.innerHTML = `<span class="muted">Loading…</span>`;
     return;
   }
-  const range = CFG.rivals?.places ?? 3;
+  const range = CFG.rivals?.points ?? 3;
   const comps = (resolvedTeamData.get(team.id)?.positions || []).filter(p => p.rows.length);
   const blocks = await Promise.all(comps.map(async p => {
     let data;
@@ -946,7 +1222,7 @@ async function renderRound() {
       (games.map(g => gameRow(g, { showDay: true, compId: p.id })).join("") || `<div class="muted">No rival matches this round.</div>`);
   }));
   if (followed.get(rivalOf) !== team) return; // selection changed while loading
-  el.innerHTML = `<div class="rival-sub">Teams within ${range} places of ${esc(team.name)} in each table it's in.</div>` +
+  el.innerHTML = `<div class="rival-sub">Teams within ${range} points (above or below) of ${esc(team.name)} in each table it's in.</div>` +
     (blocks.join("") || `<span class="muted">No tables for ${esc(team.name)}.</span>`);
 }
 
@@ -967,12 +1243,7 @@ function leaderTable(title, table, key) {
   return `<div class="leaders"><h4>${esc(title)}</h4><table><tbody>${rows}</tbody></table></div>`;
 }
 
-function compTables(id, data) {
-  const cfg = (CFG.leagues || []).find(l => l.id === id);
-  if (cfg) return pickTables(data, cfg.tables || ["current"]).map(x => tableHtml(x.title, x.table, id)).join("");
-  const g = (data.tables_groups || []).find(g => g.tables?.length && !isRelegationTable(g));
-  return g ? g.tables.map(t => tableHtml(g.tables.length > 1 ? t.name : "", t.table, id)).join("") : "";
-}
+const compTables = (id, data) => compTableList(id, data).map(x => tableHtml(x.title, x.table, id)).join("");
 
 async function renderCompRound() {
   const el = document.getElementById("comp-round");
@@ -985,7 +1256,7 @@ async function renderCompRound() {
     const games = r.games || (await cached(roundCache, `${id}/${r.key}`, () => api(`/league/games/${id}/${r.key}`))).games || [];
     if (compView.rounds[compView.idx] !== r) return; // user moved on
     const sorted = [...games].sort((a, b) => (parseStart(a.start_time) || 0) - (parseStart(b.start_time) || 0));
-    el.innerHTML = sorted.map(g => gameRow(g, { showDay: true })).join("") || `<div class="muted">No matches.</div>`;
+    el.innerHTML = sorted.map(g => gameRow(g, { showDay: true, compId: id })).join("") || `<div class="muted">No matches.</div>`;
   } catch (e) { el.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
 }
 
@@ -1197,6 +1468,42 @@ document.getElementById("m-reset").addEventListener("click", () => {
   settingsDirty = true;
   renderManage();
 });
+// Export / import: a JSON backup of the teams and players (the list in effect, even if it comes from config.js),
+// card layout, folded sections and the selected rivals team.
+document.getElementById("m-export").addEventListener("click", () => {
+  const backup = {
+    app: "futbol-tracker", version: 1, exported: new Date().toISOString(),
+    teams: [...followed.values()].map(normalizeTeam),
+    layout: storageGet(STORE_LAYOUT), foldedSections: storageGet(STORE_FOLDED), rivalOf: storageGet(STORE_RIVAL_OF),
+    nextDays: storageGet(STORE_NEXT_DAYS),
+  };
+  const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" }));
+  const a = Object.assign(document.createElement("a"), { href: url, download: `futbol-tracker-settings-${apiDate(new Date())}.json` });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+const importInput = document.getElementById("m-import-file");
+document.getElementById("m-import").addEventListener("click", () => importInput.click());
+importInput.addEventListener("change", async () => {
+  const file = importInput.files[0];
+  importInput.value = "";
+  if (!file) return;
+  let backup;
+  try {
+    backup = JSON.parse(await file.text());
+    if (backup?.app !== "futbol-tracker" || !Array.isArray(backup.teams) || backup.teams.some(t => !t?.id || !t?.name))
+      throw new Error("not a Fútbol Tracker settings file");
+  } catch (e) { alert(`Couldn't import ${file.name}: ${e.message}`); return; }
+  if (!confirm(`Replace the current teams and players with the ${backup.teams.length} in ${file.name}?`)) return;
+  const teams = backup.teams.map(normalizeTeam);
+  storageSet(STORE_TEAMS, teamsSignature(teams) === CONFIG_SIGNATURE ? null : { base: CONFIG_SIGNATURE, teams });
+  if (backup.layout) storageSet(STORE_LAYOUT, backup.layout);
+  if (Array.isArray(backup.foldedSections)) storageSet(STORE_FOLDED, backup.foldedSections);
+  if (backup.rivalOf !== undefined) storageSet(STORE_RIVAL_OF, backup.rivalOf);
+  if (backup.nextDays != null) storageSet(STORE_NEXT_DAYS, backup.nextDays);
+  location.reload();
+});
+
 document.getElementById("manage").addEventListener("click", () => { renderManage(); dlg.showModal(); });
 dlg.addEventListener("click", e => { if (e.target === dlg || e.target.closest("[data-close]")) dlg.close(); });
 dlg.addEventListener("close", () => {
@@ -1213,9 +1520,8 @@ async function loadAll() {
   for (const c of [gamecenterCache, leagueCache, teamDataCache, roundCache]) c.clear();
   todayGamesPromise = null;
   const teamsDone = renderTeams();
-  // the day view and standings show right away; rival highlighting follows once team positions are known
-  await loadStandings();
-  renderStandings();
+  renderNext();
+  // the day view shows right away; standings and rival highlighting follow once team positions are known
   await Promise.all([teamsDone, renderDay()]);
   await refreshRivalViews();
   const n = new Date();
@@ -1233,7 +1539,7 @@ document.getElementById("config-banner").addEventListener("click", e => {
 });
 
 loadTeams();
-document.getElementById("show-rivals").checked = !!CFG.showRivals;
+document.getElementById("show-rivals").checked = false; // off on every page load
 document.getElementById("show-rivals").addEventListener("change", renderDay);
 document.querySelectorAll(".day-nav [data-shift]").forEach(b => b.addEventListener("click", () => {
   const s = +b.dataset.shift;

@@ -29,19 +29,32 @@ The **Competitions** chips at the top list every competition your teams are play
 competition name in a card's footer) to see its matchday (‹ › to move between rounds), standings, and top
 scorers and assists. National teams work like clubs: search "Argentina" in Manage.
 
-In **Rivals**, pick a team under "Rivals of" to see the current round of the teams around it. Its rivals are
-also highlighted in the standings, and the day view can include their matches. Click the selected team
-again to turn rivals off.
+**Next matches** lists the upcoming matches of everything you follow, grouped by day and competition.
+
+**Standings**: pick one of your teams to see its standings. The dropdown switches between the competitions
+it's playing (its league first, then e.g. Champions League or a cup, taken from its recent and upcoming
+matches). Cups show their knockout rounds instead (pick a round; the latest one your team plays in opens
+first, ✓ marks who went through); competitions with a league phase show them below the tables once the
+knockout rounds are listed. **Show competing teams fixtures** below lists the current round of the teams within
+`rivals.points` points of it (above or below). Those teams are also highlighted in the tables, and the day view's "Display
+competing teams fixtures" toggle (off on every page load) adds their matches, with the points difference.
+Match rows show each team's position and points in that competition, and competition headers show the
+matchday or stage (e.g. "Premier League · Fecha 10", "Copa de la liga · Cuarta Ronda").
+
+**Export… / Import…** in Manage save your teams, players and layout to a JSON file and restore them from it
+(on this or another device).
 
 **In `config.js`:**
 
 - `teams`: default teams to follow. The id comes from the promiedos URL (`/team/river-plate/igi` → `igi`).
   Add `players: ["Name", ...]` to show whether that player starts, is on the bench, or is out (injured/suspended).
   Add `followTeam: false` when you only follow the team for its players.
-- `leagues`: standings to show at the bottom. `tables: ["current", "Tabla Anual"]`, where `current` is the
-  tournament in progress. For these leagues, these are also the tables used for a team's positions and rivals.
-- `rivals.places`: a team's rivals are the teams within this many positions above or below it in each table
-  it's in, counted only within that competition. Choose whose rivals to see with the "Rivals of" buttons.
+- `nextMatchesDays`: default range of the "Next matches" section, 14 (2 weeks) or 30 (1 month). The dropdown
+  at the top right of the section changes it on that device.
+- `leagues`: which tables to use for a league. `tables: ["current", "Tabla Anual"]`, where `current` is the
+  tournament in progress. These are the tables shown in Standings and used for a team's positions and rivals.
+- `rivals.points`: a team's rivals are the teams within this many points above or below it in each table
+  it's in, counted only within that competition. Choose the team with the buttons in Standings.
 - `searchLeagues`: leagues scanned to build the team-search index. promiedos has no search endpoint, so
   the index is built on first search (about 20 requests) and cached for a week.
 
