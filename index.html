@@ -253,6 +253,8 @@
   .m-pchip button { padding: 0 6px; }
   .m-players form { display: flex; gap: 4px; flex: 1; min-width: 200px; }
   .m-players input { padding: 3px 8px; font-size: 13px; }
+  .m-sugg { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 4px; }
+  .m-sugg button { font-size: 12.5px; padding: 4px 10px; border-radius: 999px; }
   .results { margin-top: 6px; max-height: 280px; overflow: auto; }
   .result { display: flex; align-items: center; gap: 8px; border-radius: 6px; padding: 5px 8px; }
   .result:hover { background: var(--chip); }
@@ -1320,8 +1322,8 @@ function manageRow(t) {
       <button class="icon danger" data-remove-team title="${t.followTeam ? "Stop following this team" : "Stop following these players"}">✕</button></div>
     <div class="m-players">
       ${t.players.map((p, i) => `<span class="m-pchip">★ ${esc(p)}<button class="icon danger" data-remove-player="${i}" title="Remove">✕</button></span>`).join("")}
-      <form><input type="text" list="dl-${esc(t.id)}" placeholder="+ follow a player" autocomplete="off">
-        <datalist id="dl-${esc(t.id)}"></datalist></form>
+      <form><input type="text" placeholder="+ follow a player" autocomplete="off" autocapitalize="words" enterkeyhint="done"></form>
+      <div class="m-sugg" hidden></div>
     </div>
   </div>`;
 }
@@ -1340,6 +1342,11 @@ mBody.addEventListener("click", e => {
   if (!box) return;
   const t = followed.get(box.dataset.team);
   const rmPlayer = e.target.closest("[data-remove-player]");
+  const pick = e.target.closest("[data-pick]");
+  if (pick) {
+    addPlayer(t, pick.dataset.pick);
+    return;
+  }
   if (e.target.closest("[data-remove-team]")) {
     // a followed team with tracked players keeps them, moving to the players row
     if (t.followTeam && t.players.length) t.followTeam = false;
@@ -1350,23 +1357,39 @@ mBody.addEventListener("click", e => {
   } else return;
   settingsChanged();
 });
-mBody.addEventListener("focusin", async e => {
+// Own suggestion list instead of <datalist>, which most mobile browsers don't show.
+async function showPlayerSuggestions(input) {
+  const box = input.closest("[data-team]");
+  const out = box.querySelector(".m-sugg");
+  const q = norm(input.value.trim());
+  if (!q) { out.hidden = true; out.innerHTML = ""; return; }
+  let names = [];
+  try { names = await squadNames(box.dataset.team); } catch { /* free text still works */ }
+  if (norm(input.value.trim()) !== q) return; // user kept typing
+  const t = followed.get(box.dataset.team);
+  const hits = names.filter(n => norm(n).includes(q) && !t.players.some(p => samePlayer(p, n)))
+    .sort((a, b) => norm(a).indexOf(q) - norm(b).indexOf(q) || a.length - b.length).slice(0, 8);
+  out.innerHTML = hits.map(n => `<button type="button" data-pick="${esc(n)}">+ ${esc(n)}</button>`).join("");
+  out.hidden = !hits.length;
+}
+function addPlayer(t, name) {
+  if (!t.players.some(p => norm(p) === norm(name))) t.players.push(name);
+  settingsChanged();
+  focusPlayerInput(t.id);
+}
+mBody.addEventListener("focusin", e => {
   const box = e.target.closest("[data-team]");
-  if (!box || e.target.tagName !== "INPUT") return;
-  const list = box.querySelector("datalist");
-  if (list.childElementCount) return;
-  try { list.innerHTML = (await squadNames(box.dataset.team)).map(n => `<option value="${esc(n)}">`).join(""); } catch { /* free text still works */ }
+  if (box && e.target.tagName === "INPUT") squadNames(box.dataset.team).catch(() => {}); // prefetch
+});
+mBody.addEventListener("input", e => {
+  if (e.target.closest("[data-team]") && e.target.tagName === "INPUT") showPlayerSuggestions(e.target);
 });
 mBody.addEventListener("submit", e => {
   e.preventDefault();
   const box = e.target.closest("[data-team]");
   if (!box) return;
-  const t = followed.get(box.dataset.team);
   const name = e.target.querySelector("input").value.trim();
-  if (!name) return;
-  if (!t.players.some(p => norm(p) === norm(name))) t.players.push(name);
-  settingsChanged();
-  focusPlayerInput(t.id);
+  if (name) addPlayer(followed.get(box.dataset.team), name);
 });
 const focusPlayerInput = id => dlg.querySelector(`[data-team="${CSS.escape(id)}"] input`)?.focus();
 
