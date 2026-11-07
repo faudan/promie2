@@ -519,9 +519,10 @@ const tvFromGame = g => (g.tv_networks || []).map(n => n.name);
 function samePlayer(a, b) { const x = norm(a), y = norm(b); return !!x && !!y && (x === y || x.includes(y) || y.includes(x)); }
 const isFollowedPlayer = (name, teamId) => [...followed.values()].some(t => (!teamId || t.id === teamId) && t.players.some(p => samePlayer(p, name)));
 
+// status of a followed player in a game, as {cls, tail}: the badge reads name + tail ("Messi" + " starts")
 function playerStatus(gc, teamId, playerName) {
   const idx = (gc.teams || []).findIndex(t => t.id === teamId);
-  if (idx < 0) return { cls: "", text: "?" };
+  if (idx < 0) return { cls: "", tail: ": ?" };
   const matches = p => samePlayer(p.name, playerName);
 
   const lu = gc.players?.lineups?.teams?.find(t => t.team_num === idx + 1);
@@ -537,30 +538,40 @@ function playerStatus(gc, teamId, playerName) {
         ev.goals?.goals ? "⚽".repeat(ev.goals.goals) : "",
         ev.substitution?.has_substitution ? `off ${Math.round(ev.substitution.time)}'` : "",
       ].filter(Boolean).join(" ");
-      return { cls: "ok", text: `${playerName} starts${probable}${extra ? " · " + extra : ""}` };
+      return { cls: "ok", tail: ` starts${probable}${extra ? " · " + extra : ""}` };
     }
     const sub = lu.bench?.find(matches);
     if (sub) {
       const ev = sub.events || {};
       const on = sub.substitution || ev.substitution?.has_substitution;
       const t = sub.substitution?.time ?? ev.substitution?.time;
-      return { cls: "warn", text: `${playerName} on the bench${probable}${on ? ` · came on${t >= 0 ? ` ${Math.round(t)}'` : ""}` : ""}` };
+      return { cls: "warn", tail: ` on the bench${probable}${on ? ` · came on${t >= 0 ? ` ${Math.round(t)}'` : ""}` : ""}` };
     }
-    if (miss) return { cls: "bad", text: `${playerName} out: ${miss.missing_details?.reason || "unavailable"}` };
-    return { cls: "bad", text: `${playerName} not in the squad${probable}` };
+    if (miss) return { cls: "bad", tail: ` out: ${miss.missing_details?.reason || "unavailable"}` };
+    return { cls: "bad", tail: ` not in the squad${probable}` };
   }
   if (miss) {
     const d = miss.missing_details || {};
     const doubtful = d.will_play_status && d.will_play_status !== 2;
-    return { cls: doubtful ? "warn" : "bad", text: `${playerName}: ${d.reason || "unavailable"}${d.will_play ? " · " + d.will_play : ""}` };
+    return { cls: doubtful ? "warn" : "bad", tail: `: ${d.reason || "unavailable"}${d.will_play ? " · " + d.will_play : ""}` };
   }
-  return { cls: "", text: `${playerName}: lineup not out yet` };
+  return { cls: "", tail: `: lineup not out yet` };
 }
 
 const badgeHtml = b => `<span class="badge ${b.cls}">${esc(b.text)}</span>`;
+const lastName = name => name.trim().split(/\s+/).pop();
+// one badge per status: players of a team in the same situation share it, by last name ("Álvarez, Griezmann starts")
 function playerBadgesFor(g, gc, onlyTeamId) {
-  return g.teams.filter(t => (!onlyTeamId || t.id === onlyTeamId) && followed.get(t.id)?.players.length)
-    .flatMap(t => followed.get(t.id).players.map(p => badgeHtml(playerStatus(gc, t.id, p)))).join("");
+  return g.teams.filter(t => (!onlyTeamId || t.id === onlyTeamId) && followed.get(t.id)?.players.length).flatMap(t => {
+    const groups = new Map(); // cls + tail -> {cls, tail, names}
+    for (const p of followed.get(t.id).players) {
+      const st = playerStatus(gc, t.id, p), key = `${st.cls}|${st.tail}`;
+      if (!groups.has(key)) groups.set(key, { ...st, names: [] });
+      groups.get(key).names.push(p);
+    }
+    return [...groups.values()].map(({ cls, tail, names }) =>
+      badgeHtml({ cls, text: (names.length > 1 ? names.map(lastName).join(", ") : names[0]) + tail }));
+  }).join("");
 }
 function statusBadge(g) {
   const st = statusInfo(g);
