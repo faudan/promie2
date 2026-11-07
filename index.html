@@ -166,12 +166,31 @@
   .game-row + .game-row { margin-top: 2px; }
   .game-row.follow { background: var(--follow-bg); }
   .game-row.rival { background: var(--rival-bg); }
+  /* Matches by day / Next matches only list your own matches (plus rivals): no highlight for yours,
+     a thin divider between rows instead, and a faint tint plus left edge for rival matches */
+  :is(#day, #next) .game-row { border-radius: 0; border-bottom: 1px solid var(--line); }
+  :is(#day, #next) .game-row + .game-row { margin-top: 0; }
+  :is(#day, #next) .game-row:last-child { border-bottom: 0; }
+  :is(#day, #next) .game-row.follow { background: none; }
+  :is(#day, #next) .game-row.rival { background: color-mix(in srgb, var(--rival-bg) 60%, transparent); box-shadow: inset 3px 0 0 var(--line); }
   .game-row .when { color: var(--muted); font-size: 12px; line-height: 1.25; }
   .game-row .when b { color: var(--text); font-size: 13.5px; display: block; }
   .game-row .teams { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-weight: 500; }
   .game-row .teams .t { display: inline-flex; align-items: center; gap: 5px; }
   .game-row .teams .vs { color: var(--muted); font-size: 12px; }
-  .game-row .score { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+  .game-row .score { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap;
+                     display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
+  .game-row .score .st { font-size: 12px; font-weight: 400; color: var(--muted); }
+  .game-row .score .result { font-size: 20px; font-weight: 800; line-height: 1.1; letter-spacing: .02em; color: var(--text); }
+  .game-row .score .result.live { color: var(--live); }
+  /* goal summary: collapsed behind a small toggle, so the result stays the main thing on the row */
+  .scorers-box { margin-top: 5px; }
+  .scorers-box summary { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; list-style: none; font-size: 12px;
+                         font-weight: 600; color: var(--muted); background: var(--chip); border-radius: 999px; padding: 1px 9px; }
+  .scorers-box summary::-webkit-details-marker { display: none; }
+  .scorers-box summary::after { content: "▸"; transition: transform .15s; }
+  .scorers-box[open] summary::after { transform: rotate(90deg); }
+  .scorers-box summary:hover { color: var(--text); }
   .meta { color: var(--muted); font-size: 12px; }
   /* goal summary: an inset panel, one line per team that scored */
   .scorers { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 8px; align-items: baseline;
@@ -519,7 +538,8 @@ function playerStatus(gc, teamId, playerName) {
     if (sub) {
       const ev = sub.events || {};
       const on = sub.substitution || ev.substitution?.has_substitution;
-      return { cls: "warn", text: `${playerName} on the bench${probable}${on ? " · came on" : ""}` };
+      const t = sub.substitution?.time ?? ev.substitution?.time;
+      return { cls: "warn", text: `${playerName} on the bench${probable}${on ? ` · came on${t >= 0 ? ` ${Math.round(t)}'` : ""}` : ""}` };
     }
     if (miss) return { cls: "bad", text: `${playerName} out: ${miss.missing_details?.reason || "unavailable"}` };
     return { cls: "bad", text: `${playerName} not in the squad${probable}` };
@@ -1114,8 +1134,16 @@ function scorersHtml(g) {
     }).join(" ");
     return `<span class="side">${esc(t.short_name || t.name)}</span><span class="list">${scorers}</span>`;
   }).join("");
-  return lines ? `<div class="scorers">${lines}</div>` : "";
+  if (!lines) return "";
+  const n = g.teams.reduce((acc, t) => acc + (t.goals?.length || 0), 0);
+  return `<details class="scorers-box" data-scorers="${esc(g.id)}"${openScorers.has(g.id) ? " open" : ""}>
+    <summary>⚽ ${n} goal${n > 1 ? "s" : ""}</summary><div class="scorers">${lines}</div></details>`;
 }
+const openScorers = new Set(); // games whose goal summary was expanded (kept across refreshes, this page load only)
+document.addEventListener("toggle", e => { // toggle doesn't bubble: listen in the capture phase
+  const id = e.target.dataset?.scorers;
+  if (id) e.target.open ? openScorers.add(id) : openScorers.delete(id);
+}, true);
 
 function gameRow(g, opts = {}) {
   const isFollow = g.teams.some(t => followed.has(t.id));
@@ -1123,8 +1151,8 @@ function gameRow(g, opts = {}) {
   const w = fmtWhen(g.start_time);
   const st = statusInfo(g);
   const right = st.kind === "scheduled" ? "" :
-    st.kind === "live" ? `<span class="badge live">${esc(st.label)}</span> ${esc(scoreText(g))}` :
-    `<span class="muted" style="font-weight:400">${esc(st.label)}</span> ${esc(scoreText(g))}`;
+    (st.kind === "live" ? `<span class="badge live">${esc(st.label)}</span>` : `<span class="st">${esc(st.label)}</span>`) +
+    `<span class="result${st.kind === "live" ? " live" : ""}">${esc(scoreText(g))}</span>`;
   const tv = tvFromGame(g);
   const note = rivalGame ? rivalNote(g, opts.compId) : "";
   const team = t => {
