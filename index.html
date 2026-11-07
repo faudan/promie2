@@ -8,6 +8,7 @@
   :root {
     --bg: #f4f5f7; --card: #ffffff; --raised: #f8f9fb; --text: #16181d; --muted: #6b7280; --line: #e3e5e9;
     --accent: #c8102e; --follow-bg: #fdecef; --rival-bg: #f1f3f6; --chip: #eef0f4;
+    --derby-bg: #fff6d1; --top-bg: #e6f0fd;
     --ok: #13834a; --ok-bg: #e3f5eb; --warn: #9a6200; --warn-bg: #fdf3dc;
     --bad: #b42318; --bad-bg: #fdeaea; --idle-bg: #eceef2; --live: #d92d20;
     --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .08);
@@ -17,6 +18,7 @@
     :root {
       --bg: #111317; --card: #1a1d23; --raised: #20242b; --text: #e8eaee; --muted: #9aa1ad; --line: #2b2f37;
       --accent: #ff4d63; --follow-bg: #3a1a20; --rival-bg: #22262d; --chip: #272b33;
+      --derby-bg: #332b0f; --top-bg: #15263d;
       --ok: #4ad191; --ok-bg: #12301f; --warn: #f1c25b; --warn-bg: #352a10;
       --bad: #ff8a80; --bad-bg: #3a1716; --idle-bg: #262a31; --live: #ff6b5e;
       --shadow: none; --lift: 0 10px 28px rgba(0, 0, 0, .6);
@@ -173,6 +175,9 @@
   :is(#day, #next) .game-row:last-child { border-bottom: 0; }
   :is(#day, #next) .game-row.follow { background: none; }
   :is(#day, #next) .game-row.rival { background: color-mix(in srgb, var(--rival-bg) 60%, transparent); box-shadow: inset 3px 0 0 var(--line); }
+  /* standout matches: two followed teams against each other (yellow), or two top-3 teams (blue) */
+  :is(#day, #next) .game-row.top3 { background: var(--top-bg); }
+  :is(#day, #next) .game-row.derby { background: var(--derby-bg); }
   .game-row .when { color: var(--muted); font-size: 12px; line-height: 1.25; }
   .game-row .when b { color: var(--text); font-size: 13.5px; display: block; }
   .game-row .teams { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-weight: 500; }
@@ -1148,6 +1153,9 @@ document.addEventListener("toggle", e => { // toggle doesn't bubble: listen in t
 function gameRow(g, opts = {}) {
   const isFollow = g.teams.some(t => followed.has(t.id));
   const rivalGame = g.teams.some(t => isRival(t.id, opts.compId));
+  const derby = g.teams.length === 2 && g.teams.every(t => followed.has(t.id));
+  const top3 = !!opts.compId && g.teams.length === 2 && g.teams.every(t => (standingIndex.get(opts.compId)?.get(t.id)?.num ?? 99) <= 3);
+  const [standout, standoutTitle] = derby ? [" derby", "Both teams are followed"] : top3 ? [" top3", "Both teams are in the top 3"] : ["", ""];
   const w = fmtWhen(g.start_time);
   const st = statusInfo(g);
   const right = st.kind === "scheduled" ? "" :
@@ -1162,7 +1170,7 @@ function gameRow(g, opts = {}) {
     const through = opts.ko && g.to_qualify > 0 && g.teams[g.to_qualify - 1] === t ? `<span class="through" title="Goes through">✓</span>` : "";
     return `<span class="t">${teamLogo(t.id, "sm")}${followed.has(t.id) ? `<strong>${label}</strong>` : label}${posTxt}${through}</span>`;
   };
-  return `<div class="game-row ${isFollow ? "follow" : rivalGame ? "rival" : ""}${opts.showDay ? " with-day" : ""}" ${isFollow ? `data-game="${esc(g.id)}"` : ""}>
+  return `<div class="game-row ${isFollow ? "follow" : rivalGame ? "rival" : ""}${opts.showDay ? " with-day" : ""}${standout}"${standoutTitle ? ` title="${standoutTitle}"` : ""} ${isFollow ? `data-game="${esc(g.id)}"` : ""}>
     <div class="when"><b>${w.time}</b>${opts.showDay ? w.day : ""}</div>
     <div><a class="teams" href="${gameUrl(g)}" target="_blank" rel="noopener">${team(g.teams[0])}<span class="vs">vs</span>${team(g.teams[1])}</a>
       ${opts.compLine ? compLine(opts.compLine, g) : ""}
