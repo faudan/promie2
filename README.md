@@ -35,7 +35,7 @@ scorers and assists. National teams work like clubs: search "Argentina" in Manag
 Followed players' badges show ⚽ for each goal and 🅰️ for each assist. Click a section title (Matches by day,
 Next matches, Standings) to fold it; folded sections are remembered per device.
 
-**Standings**: pick one of your teams to see its standings. The dropdown switches between the competitions
+**Standings**: pick one of your teams in the Team bar to see its standings (with "All" selected they are hidden). The dropdown switches between the competitions
 it's playing (its league first, then e.g. Champions League or a cup, taken from its recent and upcoming
 matches). Cups show their knockout rounds instead (pick a round; the latest one your team plays in opens
 first, ✓ marks who went through); competitions with a league phase show them below the tables once the

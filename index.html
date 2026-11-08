@@ -346,7 +346,7 @@
     <h2 class="with-control"><button class="fold-btn" aria-expanded="true"><span class="chev">▾</span>Next matches</button><span class="controls"><select id="next-sort" class="sort-sel" title="How to order the matches"></select><select id="next-range" title="How far ahead to look"></select></span></h2>
     <div id="next"><span class="muted">Loading…</span></div>
   </section>
-  <section class="wide foldable" id="standings-section">
+  <section class="wide foldable" id="standings-section" hidden>
     <h2><button class="fold-btn" aria-expanded="true"><span class="chev">▾</span>Standings</button></h2>
     <div id="standings"><span class="muted">Loading…</span></div>
     <button class="rivals-btn" id="rivals-btn" aria-expanded="false" hidden><span class="chev">▾</span><span>Show competing teams fixtures</span></button>
@@ -651,7 +651,11 @@ async function loadTeamData(t) {
     comps.get(l.id).round ??= g.stage_round_name;
   }
   for (const { g, gc } of games) if (gc?.league?.id) gameLeague.set(g.id, { id: gc.league.id, name: gc.league.name, stage: gc.stage_round_name });
-  if (!comps.size && data.main_league?.id) comps.set(data.main_league.id, { id: data.main_league.id, name: data.main_league.name });
+  // a club's domestic league counts even when its next matches are elsewhere (e.g. Racing with only a friendly
+  // coming up); a national team's main_league (an old World Cup) is only the fallback when nothing else is known
+  const ml = data.main_league;
+  const domestic = ml?.id && ml.country_id && ml.country_id === data.competitor?.country_id;
+  if (ml?.id && !comps.has(ml.id) && (domestic || !comps.size)) comps.set(ml.id, { id: ml.id, name: ml.name });
   const [positions, playerStats] = await Promise.all([
     teamPositions(t.id, [...comps.values()]),
     playerCompStats(t, data.stats?.filters || [], [...comps.values()]),
@@ -786,7 +790,7 @@ function replaceCard(t, data) {
   renderNext();
 }
 
-// How much each competition matters to you: followed teams in it, then teams followed for their players.
+// How much each competition matters to you: followed teams in it, then followed players in it (the tie-breaker).
 // A team counts for the competitions it has a table in and those of its upcoming matches (cups).
 function compWeights() {
   const w = new Map(); // comp id -> {teams, players}
@@ -797,7 +801,8 @@ function compWeights() {
     for (const m of [...d.upcoming, ...d.next]) { const lg = gameLeague.get(m.g.id); if (lg?.id) ids.add(lg.id); }
     for (const id of ids) {
       if (!w.has(id)) w.set(id, { teams: 0, players: 0 });
-      w.get(id)[t.followTeam ? "teams" : "players"]++;
+      if (t.followTeam) w.get(id).teams++;
+      w.get(id).players += t.players.length; // every followed player, on followed teams too
     }
   }
   return w;
@@ -1000,6 +1005,8 @@ function renderRivalPicker() {
   const hasTable = candidates.some(t => t.id === rivalOf);
   document.getElementById("show-rivals-label").hidden = !hasTable;
   document.getElementById("rivals-btn").hidden = !hasTable;
+  // standings only when a team is picked in the bar ("All" hides them)
+  document.getElementById("standings-section").hidden = !focusTeam;
 }
 
 function refreshRivalViews() {
