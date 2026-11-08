@@ -136,6 +136,14 @@
   section.folded .sec-toggle .action::before { content: "Show"; }
   section.folded .sec-toggle .chev { transform: rotate(-90deg); }
   section.folded .team-cards { display: none; }
+  /* Matches by day / Next matches / Standings: the title folds the section down to its header */
+  .fold-btn { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; box-shadow: none;
+              font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; }
+  .fold-btn:hover { color: var(--text); background: none; }
+  .fold-btn .chev { display: inline-block; transition: transform .15s; }
+  section.foldable.folded > :not(h2), section.foldable.folded h2 .controls { display: none; }
+  section.foldable.folded h2 { margin-bottom: 0; }
+  section.foldable.folded .fold-btn .chev { transform: rotate(-90deg); }
   .config-banner { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; border-left: 4px solid var(--warn); background: var(--warn-bg); }
   .config-banner[hidden] { display: none; }
   .config-banner .actions { display: flex; gap: 8px; margin-left: auto; }
@@ -323,8 +331,8 @@
   <section class="wide bare" id="team-bar-section">
     <div class="rival-picker" id="rival-picker"></div>
   </section>
-  <section>
-    <h2 class="with-control">Matches by day<span class="controls"><select id="day-sort" class="sort-sel" title="How to order the matches"></select></span></h2>
+  <section class="foldable" id="day-section">
+    <h2 class="with-control"><button class="fold-btn" aria-expanded="true"><span class="chev">▾</span>Matches by day</button><span class="controls"><select id="day-show" title="Which matches to show"></select><select id="day-sort" class="sort-sel" title="How to order the matches"></select></span></h2>
     <div class="day-nav">
       <button data-shift="-1">←</button>
       <button data-shift="0">Today</button>
@@ -334,12 +342,12 @@
     </div>
     <div id="day"><span class="muted">Loading…</span></div>
   </section>
-  <section>
-    <h2 class="with-control">Next matches<span class="controls"><select id="next-sort" class="sort-sel" title="How to order the matches"></select><select id="next-range" title="How far ahead to look"></select></span></h2>
+  <section class="foldable" id="next-section">
+    <h2 class="with-control"><button class="fold-btn" aria-expanded="true"><span class="chev">▾</span>Next matches</button><span class="controls"><select id="next-sort" class="sort-sel" title="How to order the matches"></select><select id="next-range" title="How far ahead to look"></select></span></h2>
     <div id="next"><span class="muted">Loading…</span></div>
   </section>
-  <section class="wide" id="standings-section">
-    <h2>Standings</h2>
+  <section class="wide foldable" id="standings-section">
+    <h2><button class="fold-btn" aria-expanded="true"><span class="chev">▾</span>Standings</button></h2>
     <div id="standings"><span class="muted">Loading…</span></div>
     <button class="rivals-btn" id="rivals-btn" aria-expanded="false" hidden><span class="chev">▾</span><span>Show competing teams fixtures</span></button>
     <div id="round" hidden></div>
@@ -386,6 +394,7 @@ const STORE_LAYOUT = "tracker.layout.v1";  // {order: [ids], expanded: [ids]}: c
 const STORE_FOLDED = "tracker.foldedSections.v1";
 const STORE_RIVAL_OF = "tracker.rivalOf.v1";
 const STORE_NEXT_DAYS = "tracker.nextDays.v1";
+const STORE_DAY_SHOW = "tracker.dayShow.v1"; // "all" | "unfinished" | "live"
 const STORE_SORT = "tracker.sort.v1"; // {day, next}: "comp" (grouped by competition) or "time"
 const STORE_INDEX = `tracker.teamIndex.v1:${(CFG.searchLeagues || []).join(",")}`; // rebuilt when the league list changes
 const INDEX_MAX_AGE = 7 * 864e5;
@@ -531,11 +540,18 @@ function playerStatus(gc, teamId, playerName) {
 
   if (lu && (lu.starting?.length || lu.bench?.length)) {
     const probable = lu.status && norm(lu.status) !== "confirmado" ? " (probable)" : "";
+    // goals from the player's events; assists only from the timeline, where a goal lists scorer then assister
+    const contributions = p => {
+      const goals = p.events?.goals?.goals || 0;
+      const assists = (gc.events || []).flatMap(s => s.rows || []).flatMap(r => r.events || [])
+        .filter(e => e.type === 1 && e.team === idx + 1 && e.texts?.[1] && samePlayer(e.texts[1], p.name)).length;
+      return "⚽".repeat(goals) + "🅰️".repeat(assists);
+    };
     const starter = lu.starting?.find(matches);
     if (starter) {
       const ev = starter.events || {};
       const extra = [
-        ev.goals?.goals ? "⚽".repeat(ev.goals.goals) : "",
+        contributions(starter),
         ev.substitution?.has_substitution ? `off ${Math.round(ev.substitution.time)}'` : "",
       ].filter(Boolean).join(" ");
       return { cls: "ok", tail: ` starts${probable}${extra ? " · " + extra : ""}` };
@@ -545,7 +561,8 @@ function playerStatus(gc, teamId, playerName) {
       const ev = sub.events || {};
       const on = sub.substitution || ev.substitution?.has_substitution;
       const t = sub.substitution?.time ?? ev.substitution?.time;
-      return { cls: "warn", tail: ` on the bench${probable}${on ? ` · came on${t >= 0 ? ` ${Math.round(t)}'` : ""}` : ""}` };
+      const extra = on ? contributions(sub) : "";
+      return { cls: "warn", tail: ` on the bench${probable}${on ? ` · came on${t >= 0 ? ` ${Math.round(t)}'` : ""}${extra ? " " + extra : ""}` : ""}` };
     }
     if (miss) return { cls: "bad", tail: ` out: ${miss.missing_details?.reason || "unavailable"}` };
     return { cls: "bad", tail: ` not in the squad${probable}` };
@@ -845,15 +862,15 @@ function renderTeams() {
     teamData(t).catch(e => ({ error: e.message })).then(data => replaceCard(t, data))));
 }
 
-// fold / unfold the "My teams" and "Players" sections, to get to what's below faster
+// fold / unfold the "My teams" and "Players" sections (and the match lists and standings), to get to what's below faster
 function applyFolded() {
   const folded = storageGet(STORE_FOLDED) || [];
-  for (const sec of ["teams-section", "players-section"].map(id => document.getElementById(id))) {
+  for (const sec of document.querySelectorAll("#teams-section, #players-section, section.foldable")) {
     sec.classList.toggle("folded", folded.includes(sec.id));
-    sec.querySelector(".sec-toggle").setAttribute("aria-expanded", String(!folded.includes(sec.id)));
+    sec.querySelector(".sec-toggle, .fold-btn").setAttribute("aria-expanded", String(!folded.includes(sec.id)));
   }
 }
-document.querySelectorAll(".sec-toggle").forEach(b => b.addEventListener("click", () => {
+document.querySelectorAll(".sec-toggle, .fold-btn").forEach(b => b.addEventListener("click", () => {
   const id = b.closest("section").id;
   const folded = storageGet(STORE_FOLDED) || [];
   storageSet(STORE_FOLDED, folded.includes(id) ? folded.filter(x => x !== id) : [...folded, id]);
@@ -1219,6 +1236,18 @@ for (const [list, sel, render] of [["day", "day-sort", () => renderDay()], ["nex
   el.addEventListener("change", () => { storageSet(STORE_SORT, { ...(storageGet(STORE_SORT) || {}), [list]: el.value }); render(); });
 }
 
+// which matches the day view shows: all, all but the finished ones, or only the ones being played now
+const DAY_SHOWS = [["all", "All matches"], ["unfinished", "Hide finished"], ["live", "Live now"]];
+const dayShow = () => DAY_SHOWS.some(([v]) => v === storageGet(STORE_DAY_SHOW)) ? storageGet(STORE_DAY_SHOW) : "all";
+const dayShowSel = document.getElementById("day-show");
+dayShowSel.innerHTML = DAY_SHOWS.map(([v, label]) => `<option value="${v}">${label}</option>`).join("");
+dayShowSel.value = dayShow();
+dayShowSel.addEventListener("change", () => { storageSet(STORE_DAY_SHOW, dayShowSel.value); renderDay(); });
+const shownByDayFilter = g => {
+  const kind = statusInfo(g).kind, show = dayShow();
+  return show === "live" ? kind === "live" : show === "unfinished" ? kind !== "finished" : true;
+};
+
 // ---------- Next matches: upcoming matches of all followed teams, by day and competition ----------
 // Covers the chosen range (2 weeks / 1 month). A team's "next" list has no competition, so games past the
 // ones loaded for its card get it from their gamecenter, fetched once and kept across auto-refreshes.
@@ -1315,9 +1344,13 @@ async function renderDay() {
     const sections = [];
     const playerGames = [];
     const timed = []; // {g, lg}, for the "by time" order
+    let hiddenByFilter = 0;
     const cmp = byCompWeight();
     for (const lg of [...data.leagues || []].sort((a, b) => cmp(a.id, b.id))) {
       const games = (lg.games || []).filter(g => g.teams.some(t => followed.has(t.id) || (withRivals && isRival(t.id, lg.id))));
+      const allGames = games.length;
+      games.splice(0, games.length, ...games.filter(shownByDayFilter));
+      hiddenByFilter += allGames - games.length;
       if (!games.length) continue;
       games.sort((a, b) => (parseStart(a.start_time) || 0) - (parseStart(b.start_time) || 0));
       games.forEach(g => { if (g.teams.some(t => followed.get(t.id)?.players.length)) playerGames.push(g); });
@@ -1327,7 +1360,12 @@ async function renderDay() {
     if (sortOf("day") === "time")
       sections.splice(0, sections.length, timed.sort((a, b) => (parseStart(a.g.start_time) || 0) - (parseStart(b.g.start_time) || 0))
         .map(({ g, lg }) => gameRow(g, { compId: lg.id, scorers: true, compLine: lg })).join(""));
-    el.innerHTML = sections.join("") || `<div class="muted">Nothing of yours ${dayOffset === 0 ? "today" : "this day"}.</div>`;
+    const when = dayOffset === 0 ? "today" : "this day";
+    el.innerHTML = sections.join("") || `<div class="muted">${!hiddenByFilter ? `Nothing of yours ${when}.`
+      : dayShow() === "live" ? `None of your ${hiddenByFilter} match${hiddenByFilter > 1 ? "es" : ""} ${when} ${hiddenByFilter > 1 ? "are" : "is"} being played right now.`
+      : `All your matches ${when} are finished.`}</div>`;
+    if (sections.length && hiddenByFilter)
+      el.insertAdjacentHTML("beforeend", `<div class="meta" style="margin-top:8px">${hiddenByFilter} ${dayShow() === "live" ? "other" : "finished"} match${hiddenByFilter > 1 ? "es" : ""} hidden.</div>`);
     // fill in player availability for matches that have a watched player
     await Promise.all(playerGames.map(async g => {
       try {
