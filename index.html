@@ -514,7 +514,11 @@ function statusInfo(g) {
   const e = g.status?.enum;
   if (e === 1) return { kind: "scheduled" };
   if (e === 3) return { kind: "finished", label: g.status.short_name || "Final" };
-  if (e === 2) return { kind: "live", label: g.game_time_to_display || g.game_time_status_to_display || "Live" };
+  if (e === 2) {
+    // at half time game_time_to_display stays on "45'" while promiedos shows "ET" (entretiempo)
+    const ht = /entretiempo|descanso|^ET$/i.test(`${g.status.name}`) || /^ET$/i.test(`${g.status.short_name}`);
+    return { kind: "live", label: ht ? "ET" : g.game_time_status_to_display || g.game_time_to_display || "Live" };
+  }
   return { kind: "other", label: g.status?.name || "" };
 }
 const scoreText = g => Array.isArray(g.scores) ? g.scores.map(n => Math.round(n)).join(" - ") : "";
@@ -1307,7 +1311,9 @@ function renderNext() {
   const scroll = el.scrollTop;
   const byTime = sortOf("next") === "time";
   const cmp = byCompWeight();
-  const row = (lg, { g, gc }) => gameRow(gc?.status ? { ...g, status: gc.status, scores: gc.scores ?? g.scores } : g,
+  const row = (lg, { g, gc }) => gameRow(gc?.status ? { ...g, status: gc.status, scores: gc.scores ?? g.scores,
+      game_time_to_display: gc.game_time_to_display ?? g.game_time_to_display,
+      game_time_status_to_display: gc.game_time_status_to_display ?? g.game_time_status_to_display } : g,
     { badges: gc ? playerBadgesFor(g, gc) : "", compId: lg.id, compLine: byTime ? lg : null });
   el.innerHTML = [...days].map(([day, { today, leagues }]) => {
     const groups = [...leagues.values()];
